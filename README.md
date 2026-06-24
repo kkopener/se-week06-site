@@ -242,6 +242,8 @@ CSVアップロードにより一括更新を行う．
 
 ## 1. ユースケース図
 
+```mermaid
+
 graph LR
     %% アクターの定義
     subgraph Actors [アクター]
@@ -295,9 +297,13 @@ graph LR
     %% スタイルの調整
     style Emp fill:#f9f,stroke:#333,stroke-width:2px
     style Admin fill:#bbf,stroke:#333,stroke-width:2px
+```
+
+
 
 ## 2. クラス図
 
+```mermaid
 classDiagram
     class Shop {
         +String shopCode
@@ -367,11 +373,12 @@ classDiagram
     %% 関連 (Association) - 操作・利用の関係
     Admin ..> CSVManager : CSVアップロード/保存で利用
     ShiftTable ..> CSVManager : データの読み書きで利用
+```
 
 ## 3. シーケンス図
 
 ### 3.1. 従業員のシフト提出
-
+```mermaid
 sequenceDiagram
     autonumber
     actor Emp as 一般従業員 (Actor)
@@ -412,8 +419,10 @@ sequenceDiagram
     deactivate Ctrl
     UI -->> Emp: 画面に処理結果を表示
     deactivate UI
+```
 
 ### 3.2. 管理者によるシフトの自動調整および手動調整
+```mermaid
 sequenceDiagram
     autonumber
     actor Admin as 管理者 (Actor)
@@ -468,8 +477,10 @@ sequenceDiagram
     deactivate Ctrl
     UI -->> Admin: 「変更を保存しました」と合計時間を画面に表示
     deactivate UI
+```
 
 ## 4. 状態遷移図
+```mermaid
 stateDiagram-v2
     [*] --> 未作成 : 月が替わる / 管理者が新しい月を指定
 
@@ -499,6 +510,7 @@ stateDiagram-v2
     確定・公開済み --> バックアップ完了 : トリガー: 管理者が「CSVダウンロード」を実行<br>(ローカルPCへ保存)
 
     バックアップ完了 --> [*] : 月の終了 (運用の終了)
+```
 
 # 開発環境およびGitHubリポジトリ
 
