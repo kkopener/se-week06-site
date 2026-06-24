@@ -584,13 +584,14 @@ st.write("開発環境の動作確認")
 ---
 
 ## GitHubリポジトリ
-
+```text
 github_test/
 │
 ├─ autoshift.py
 ├─ README.md
 ├─ employees.csv
 └─ shifts_2026_07.csv
+```
 
 現段階ではプロジェクト初期段階であり、
 システム本体およびCSVデータは今後実装予定である。
