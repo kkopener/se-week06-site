@@ -596,3 +596,161 @@ github_test/
 現段階ではプロジェクト初期段階であり、
 システム本体およびCSVデータは今後実装予定である。
 現在は開発環境構築および要件定義・設計の段階である。
+
+#　作成コード
+
+```bash
+import streamlit as st
+import pandas as pd
+import os
+from datetime import date
+import calendar
+
+# ページ設定
+st.set_page_config(page_title="シフト自動調整管理アプリ", layout="centered")
+
+# --- 1. データ読み込み・保存関数 ---
+@st.cache_data
+def load_employees():
+    if os.path.exists("employees.csv"):
+        return pd.read_csv("employees.csv")
+    else:
+        st.error("employees.csv が見つかりません。")
+        return pd.DataFrame()
+
+def save_holiday_request(shop_code, emp_id, selected_dates, memo):
+    """休み希望をCSVに保存する"""
+    file_name = "holiday_requests.csv"
+    
+    # 既存の希望データがあれば読み込み、なければ新規作成
+    if os.path.exists(file_name):
+        df_req = pd.read_csv(file_name)
+    else:
+        df_req = pd.DataFrame(columns=["店舗コード", "従業員ID", "日付", "備考"])
+    
+    # 今回提出されたデータをリスト化
+    new_requests = []
+    for d in selected_dates:
+        new_requests.append({
+            "店舗コード": shop_code,
+            "従業員ID": emp_id,
+            "日付": d.strftime("%Y-%m-%d"),
+            "備考": memo
+        })
+    
+    # データフレームを結合して保存
+    if new_requests:
+        df_new = pd.DataFrame(new_requests)
+        df_req = pd.concat([df_req, df_new], ignore_index=True)
+        # 同一人物が同じ日を再度申請した場合は最新のものに上書き（重複排除）
+        df_req = df_req.drop_duplicates(subset=["店舗コード", "従業員ID", "日付"], keep="last")
+        df_req.to_csv(file_name, index=False, encoding="utf-8-sig")
+        return True
+    return False
+
+# --- 2. ログイン画面 ---
+def login_screen():
+    st.title("簡易複数店舗対応型・シフト自動調整管理")
+    st.subheader("ログイン")
+    
+    with st.form("login_form"):
+        shop_code = st.text_input("店舗コード")
+        emp_id = st.text_input("従業員ID")
+        password = st.text_input("パスワード", type="password")
+        submit_btn = st.form_submit_button("ログイン")
+        
+        if submit_btn:
+            df_emp = load_employees()
+            if df_emp.empty:
+                return
+            
+            user = df_emp[(df_emp["店舗コード"] == shop_code) & 
+                          (df_emp["従業員ID"] == emp_id) & 
+                          (df_emp["パスワード"] == password)]
+            
+            if not user.empty:
+                st.session_state["logged_in"] = True
+                st.session_state["role"] = user.iloc[0]["役割"]
+                st.session_state["name"] = user.iloc[0]["氏名"]
+                st.session_state["emp_id"] = emp_id
+                st.session_state["shop_code"] = shop_code
+                st.rerun()
+            else:
+                st.error("入力された情報が間違っています。")
+
+# --- 3. 従業員ダッシュボード (Phase 2 追加部分) ---
+def employee_dashboard():
+    st.title("従業員ダッシュボード")
+    st.subheader("休み希望提出フォーム")
+    
+    # 対象月を2026年7月に固定して日付リストを生成
+    target_year = 2026
+    target_month = 7
+    num_days = calendar.monthrange(target_year, target_month)[1]
+    
+    # 7月1日〜31日までのリストを作成
+    date_options = [date(target_year, target_month, day) for day in range(1, num_days + 1)]
+    
+    with st.form("holiday_request_form"):
+        st.write(f"**{target_year}年{target_month}月** の休み希望を選択してください。")
+        
+        # 複数選択ドロップダウン
+        selected_dates = st.multiselect(
+            "希望休の日付 (複数選択可)",
+            options=date_options,
+            format_func=lambda x: x.strftime("%m月%d日 (%a)") # 表示形式の調整
+        )
+        
+        memo = st.text_input("備考 (任意)", placeholder="例: 帰省のため、テスト期間のため 等")
+        
+        submit_btn = st.form_submit_button("提出する")
+        
+        if submit_btn:
+            if not selected_dates:
+                st.warning("日付が選択されていません。")
+            else:
+                success = save_holiday_request(
+                    st.session_state["shop_code"],
+                    st.session_state["emp_id"],
+                    selected_dates,
+                    memo
+                )
+                if success:
+                    st.success("休み希望を提出しました！")
+
+# --- 4. メイン処理（ルーティング） ---
+def main():
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+
+    if not st.session_state["logged_in"]:
+        login_screen()
+    else:
+        # サイドバーの設定
+        st.sidebar.write(f"所属: {st.session_state['shop_code']}")
+        st.sidebar.write(f"氏名: **{st.session_state['name']}** さん")
+        if st.sidebar.button("ログアウト"):
+            st.session_state.clear()
+            st.rerun()
+
+        # 役割（ロール）による画面分岐
+        if st.session_state["role"] == "admin":
+            st.title("管理者ダッシュボード")
+            st.write("現在 Phase 2 です。管理者の処理は今後のフェーズで実装します。")
+            
+            # 管理者向けに提出状況をチラ見せする機能（FR-05の一部）
+            if os.path.exists("holiday_requests.csv"):
+                st.subheader("現在の休み希望 提出状況")
+                df_req = pd.read_csv("holiday_requests.csv")
+                # 自分の店舗のデータだけ表示
+                df_req_shop = df_req[df_req["店舗コード"] == st.session_state["shop_code"]]
+                st.dataframe(df_req_shop)
+            else:
+                st.info("まだ提出された休み希望はありません。")
+                
+        elif st.session_state["role"] == "employee":
+            employee_dashboard()
+
+if __name__ == "__main__":
+    main()
+```
